@@ -270,52 +270,76 @@ def boustrophedon_motion(
             steps += 1
         return steps, seen
 
-    def pick_dir_by_rule(rr, cc, main_axis, R):
-        # Trả về (dir_idx, new_axis) theo luật cảm biến
-        dN, sN = sense_one_dir(rr, cc, -1, 0, R)
-        dS, sS = sense_one_dir(rr, cc,  1, 0, R)
-        dE, sE = sense_one_dir(rr, cc,  0, 1, R)
-        dW, sW = sense_one_dir(rr, cc,  0, -1, R)
-        axis_NS_known = (sN and sS)
-        axis_EW_known = (sE and sW)
+    def pick_dir_by_rule(rr, cc, main_axis, R, delta_penalty=0.6):
+        """
+        Trả về (dir_idx, new_axis) theo luật cảm biến có xét 'một bên quá xa'.
+        - Nếu hai phía của một trục đều 'seen' (gặp biên/chướng ngại trong R) → dùng tổng d làm score như cũ.
+        - Nếu chỉ thấy một phía → dùng d_phía_thấy + (R * (1 - delta_penalty)) làm score mềm cho phía kia (bị phạt).
+        - Khi đã chốt trục, chọn hướng có d NGẮN HƠN (giảm roll-in).
+        """
 
-        axes = []
-        if axis_NS_known:
-            axes.append(("NS", dN + dS))
-        if axis_EW_known:
-            axes.append(("EW", dE + dW))
-        if axes:
-            axes.sort(key=lambda t: t[1], reverse=True)
-            if axes[0][0] == "NS":
-                return (0 if dN >= dS else 1), "NS"
-            else:
-                return (2 if dE >= dW else 3), "EW"
+        def sense_all(r, c, R):
+            dN, sN = sense_one_dir(r, c, -1, 0, R)
+            dS, sS = sense_one_dir(r, c,  1, 0, R)
+            dE, sE = sense_one_dir(r, c,  0, 1, R)
+            dW, sW = sense_one_dir(r, c,  0, -1, R)
+            return (dN, sN, dS, sS, dE, sE, dW, sW)
 
-        if axis_NS_known ^ axis_EW_known:
-            if axis_NS_known:  # đi trục EW
-                if (not sE) and (not sW):
-                    return (2 if dE >= dW else 3), "EW"
-                if not sE:
-                    return 2, "EW"
-                if not sW:
-                    return 3, "EW"
-                return (2 if dE >= dW else 3), "EW"
-            else:              # đi trục NS
-                if (not sN) and (not sS):
-                    return (0 if dN >= dS else 1), "NS"
-                if not sN:
-                    return 0, "NS"
-                if not sS:
-                    return 1, "NS"
-                return (0 if dN >= dS else 1), "NS"
+        dN, sN, dS, sS, dE, sE, dW, sW = sense_all(rr, cc, R)
 
-        # Fallback theo trục hiện tại
-        pref = ([(-1, 0, 0), (1, 0, 1), (0, 1, 2), (0, -1, 3)] if main_axis == "NS"
-                else [(0, 1, 2), (0, -1, 3), (-1, 0, 0), (1, 0, 1)])
-        for dr, dc, idx in pref:
-            if is_free(rr+dr, cc+dc):
-                return idx, main_axis
-        return None, main_axis
+        # --- chấm điểm trục NS ---
+        if sN and sS:
+            score_NS = dN + dS
+            NS_known = True
+        else:
+            # soft-score: phía không thấy coi như R, nhưng bị phạt
+            dN_soft = dN if sN else R * (1 - delta_penalty)
+            dS_soft = dS if sS else R * (1 - delta_penalty)
+            score_NS = dN_soft + dS_soft
+            NS_known = False
+
+        # --- chấm điểm trục EW ---
+        if sE and sW:
+            score_EW = dE + dW
+            EW_known = True
+        else:
+            dE_soft = dE if sE else R * (1 - delta_penalty)
+            dW_soft = dW if sW else R * (1 - delta_penalty)
+            score_EW = dE_soft + dW_soft
+            EW_known = False
+
+        # --- chọn trục: ưu tiên trục có score cao hơn; nếu bằng, ưu tiên khác trục hiện tại ---
+        if score_NS > score_EW:
+            chosen_axis = "NS"
+        elif score_EW > score_NS:
+            chosen_axis = "EW"
+        else:
+            chosen_axis = ("EW" if main_axis == "NS" else "NS")
+
+        # --- trên trục đã chọn, chọn HƯỚNG 'gần hơn' để giảm roll-in ---
+        if chosen_axis == "NS":
+            # Nếu cả N và S đều free: chọn hướng có d nhỏ hơn
+            cand = []
+            if is_free(rr-1, cc):  # N
+                cand.append((0, dN))
+            if is_free(rr+1, cc):  # S
+                cand.append((1, dS))
+            if cand:
+                cand.sort(key=lambda x: x[1])  # d nhỏ hơn ưu tiên
+                return cand[0][0], "NS"
+            # fallback ưu tiên theo d nhỏ hơn dù ô đầu chưa free
+            return (0 if dN <= dS else 1), "NS"
+
+        else:  # "EW"
+            cand = []
+            if is_free(rr, cc+1):  # E
+                cand.append((2, dE))
+            if is_free(rr, cc-1):  # W
+                cand.append((3, dW))
+            if cand:
+                cand.sort(key=lambda x: x[1])
+                return cand[0][0], "EW"
+            return (2 if dE <= dW else 3), "EW"
 
     # ---------- init pattern ----------
     main_axis = "NS" if start_dir_index in (0, 1) else "EW"
@@ -434,7 +458,7 @@ def boustrophedon_motion(
                         r, c, main_axis, sensor_radius)
                     if new_axis != main_axis:
                         main_axis = new_axis
-                        prev_lap = 0
+                        prev_lap = cur_lap
                         cur_lap = 0
                         long_dir, side_dir = apply_axis_switch(
                             long_dir, side_dir)

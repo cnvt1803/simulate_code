@@ -26,7 +26,7 @@ class PygameVisualizer:
         self.is_running = False
         self.algorithm_running = False
         # sensing radius
-        self.sensor_radius = 15    # bán kính r theo đơn vị Ô
+        self.sensor_radius = 15  # bán kính r theo đơn vị Ô
         self.show_sensor = True
         # Path tracking for visualization
         self.coverage_paths = []  # List of coverage paths with different colors
