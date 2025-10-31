@@ -25,7 +25,9 @@ class PygameVisualizer:
         self.is_paused = False
         self.is_running = False
         self.algorithm_running = False
-
+        # sensing radius
+        self.sensor_radius = 15    # bán kính r theo đơn vị Ô
+        self.show_sensor = True
         # Path tracking for visualization
         self.coverage_paths = []  # List of coverage paths with different colors
         # Only show selected backtracking points
@@ -70,7 +72,8 @@ class PygameVisualizer:
             'panel_bg': (240, 240, 240),
             'button_normal': (200, 200, 200),
             'button_hover': (180, 180, 180),
-            'button_pressed': (160, 160, 160)
+            'button_pressed': (160, 160, 160),
+            'sensor_yellow': (255, 255, 150)
         }
 
         # Initialize grid
@@ -166,12 +169,28 @@ class PygameVisualizer:
                     self.handle_mouse_hover(event.pos)
 
             elif event.type == pygame.KEYDOWN:
+                # --- Xử lý phím ---
                 if event.key == pygame.K_SPACE:
                     self.toggle_pause()
+
                 elif event.key == pygame.K_r:
                     self.reset_grid()
+
                 elif event.key == pygame.K_s and not self.algorithm_running:
                     self.start_algorithm()
+
+                elif event.key == pygame.K_v:
+                    # Bật/tắt hiển thị cảm biến
+                    self.show_sensor = not self.show_sensor
+
+                elif event.key in (pygame.K_EQUALS, pygame.K_PLUS):
+                    # Tăng bán kính cảm biến
+                    self.sensor_radius = min(
+                        self.sensor_radius + 1, self.grid_size)
+
+                elif event.key == pygame.K_MINUS:
+                    # Giảm bán kính cảm biến
+                    self.sensor_radius = max(0, self.sensor_radius - 1)
 
         return True
 
@@ -229,7 +248,8 @@ class PygameVisualizer:
             self.buttons['pause']['text'] = 'Pause'
 
             def run_ba_star():
-                ba_star_robot = BAStar(self.grid, self.robot_pos)
+                ba_star_robot = BAStar(
+                    self.grid, self.robot_pos, sensor_radius=self.sensor_radius)
 
                 # Set up callbacks for visualization
                 ba_star_robot.set_callbacks(
@@ -322,75 +342,86 @@ class PygameVisualizer:
         grid_surface = pygame.Surface((self.window_size, self.window_size))
         grid_surface.fill(self.colors['white'])
 
-        # Base color mapping
+        # 1) Vẽ base grid cells trước
         cell_colors = {
             FREE_UNCOVERED: self.colors['white'],
             OBSTACLE: self.colors['black'],
             COVERED: self.colors['white']
         }
-
-        # Draw base grid cells
         for r in range(self.grid_size):
             for c in range(self.grid_size):
                 x = c * self.cell_size
                 y = r * self.cell_size
                 rect = pygame.Rect(x, y, self.cell_size, self.cell_size)
-
                 color = cell_colors.get(self.grid[r][c], self.colors['white'])
                 pygame.draw.rect(grid_surface, color, rect)
                 pygame.draw.rect(
                     grid_surface, self.colors['light_gray'], rect, 1)
 
-        # Draw coverage paths with different colors
+        # 2) Vẽ SENSOR OVERLAY sau base cells (để không bị đè)
+        if self.show_sensor and self.sensor_radius > 0:
+            overlay = pygame.Surface(
+                (self.window_size, self.window_size), pygame.SRCALPHA)
+
+            # tâm robot theo pixel
+            rr, rc = self.robot_pos
+            robot_x = rc * self.cell_size + self.cell_size // 2
+            robot_y = rr * self.cell_size + self.cell_size // 2
+
+            if getattr(self, "sensor_circle_mode", True):
+                # vẽ vòng tròn pixel: bán kính theo số ô * kích thước ô
+                radius_px = max(1, self.sensor_radius * self.cell_size)
+                pygame.draw.circle(overlay, (255, 255, 150, 90),
+                                   (robot_x, robot_y), radius_px)
+                # (tuỳ chọn) vẽ viền mềm hơn:
+                # import pygame.gfxdraw ở đầu file nếu muốn anti-aliased border
+                # pygame.gfxdraw.aacircle(overlay, robot_x, robot_y, radius_px, (255,255,150,120))
+            else:
+                # chế độ cũ: highlight theo từng ô trong bán kính
+                rmin = max(0, rr - self.sensor_radius)
+                rmax = min(self.grid_size - 1, rr + self.sensor_radius)
+                cmin = max(0, rc - self.sensor_radius)
+                cmax = min(self.grid_size - 1, rc + self.sensor_radius)
+                for r in range(rmin, rmax + 1):
+                    for c in range(cmin, cmax + 1):
+                        dx, dy = r - rr, c - rc
+                        if dx*dx + dy*dy <= self.sensor_radius*self.sensor_radius and self.grid[r][c] != OBSTACLE:
+                            x = c * self.cell_size
+                            y = r * self.cell_size
+                            pygame.draw.rect(overlay, (255, 255, 150, 90),
+                                             (x, y, self.cell_size, self.cell_size))
+
+            grid_surface.blit(overlay, (0, 0))
+
+        # 3) Coverage paths (màu), 4) A* path (đen), 5) Backtracking points (đỏ)
         for path_idx, coverage_path in enumerate(self.coverage_paths):
             if coverage_path and len(coverage_path) > 1:
                 path_color = self.path_colors[path_idx % len(self.path_colors)]
-                points = []
-                for r, c in coverage_path:
-                    x = c * self.cell_size + self.cell_size // 2
-                    y = r * self.cell_size + self.cell_size // 2
-                    points.append((x, y))
+                pts = [(c*self.cell_size + self.cell_size//2,
+                        r*self.cell_size + self.cell_size//2) for r, c in coverage_path]
+                pygame.draw.lines(grid_surface, path_color, False, pts, 3)
 
-                if len(points) > 1:
-                    pygame.draw.lines(
-                        grid_surface, path_color, False, points, 3)
-
-        # Draw A* paths in black
         for astar_path in self.current_astar_path:
             if len(astar_path) > 1:
-                points = []
-                for r, c in astar_path:
-                    x = c * self.cell_size + self.cell_size // 2
-                    y = r * self.cell_size + self.cell_size // 2
-                    points.append((x, y))
+                pts = [(c*self.cell_size + self.cell_size//2,
+                        r*self.cell_size + self.cell_size//2) for r, c in astar_path]
+                pygame.draw.lines(
+                    grid_surface, self.colors['black'], False, pts, 4)
 
-                if len(points) > 1:
-                    pygame.draw.lines(
-                        grid_surface, self.colors['black'], False, points, 4)
-
-        # Draw selected backtracking points as red diamonds
         for r, c in self.selected_backtracking_points:
             cx = c * self.cell_size + self.cell_size // 2
             cy = r * self.cell_size + self.cell_size // 2
             size = self.cell_size // 3
-
-            # Create diamond shape points
-            points = [
-                (cx, cy - size),      # top
-                (cx + size, cy),      # right
-                (cx, cy + size),      # bottom
-                (cx - size, cy)       # left
-            ]
+            points = [(cx, cy-size), (cx+size, cy),
+                      (cx, cy+size), (cx-size, cy)]
             pygame.draw.polygon(grid_surface, self.colors['red'], points)
             pygame.draw.polygon(
                 grid_surface, self.colors['dark_red'], points, 2)
 
-        # Draw robot position as green circle
+        # 6) Robot (vẽ cuối cùng để nằm trên cùng)
         robot_r, robot_c = self.robot_pos
         robot_x = robot_c * self.cell_size + self.cell_size // 2
         robot_y = robot_r * self.cell_size + self.cell_size // 2
-
-        # Draw robot as a small car
         self.draw_robot_car(grid_surface, robot_x, robot_y)
 
         return grid_surface
@@ -515,6 +546,7 @@ class PygameVisualizer:
             ("• A* paths: Black lines", self.colors['black']),
             ("• Backtrack points: Red diamonds", self.colors['red']),
             ("• Robot: Green circle", self.colors['green']),
+            ("• Sensor radius: Light yellow", self.colors['sensor_yellow']),
         ]
 
         for text, color in legend_items:
@@ -533,6 +565,8 @@ class PygameVisualizer:
             "SPACE: Pause/Resume",
             "S: Start Algorithm",
             "R: Reset Grid",
+            "V: Toggle Sensor Overlay",
+            "+ / -: Increase/Decrease Radius",
         ]
 
         for text in control_items:

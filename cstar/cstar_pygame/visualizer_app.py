@@ -6,12 +6,18 @@ import pygame
 import sys
 import threading
 from ..cstar_algorithm.cstar import CStar
-from ..cstar_algorithm.constants import FREE_UNCOVERED, OBSTACLE, COVERED, FRONTIER
+from cstar.cstar_algorithm.constants import (
+    FREE_UNCOVERED,
+    OBSTACLE,
+    COVERED,
+    FRONTIER,
+)
 
 
 from .visualizer_ui import UIState, setup_ui_elements, handle_mouse_hover, update_slider
 from .visualizer_render import draw_grid, draw_info_panel
 from .visualizer_callbacks import update_display, update_rcg_display, update_path_display
+
 
 class CStarPygameVisualizer:
     def __init__(self, grid_size=50, cell_size=12, step_size=0.01):
@@ -25,7 +31,7 @@ class CStarPygameVisualizer:
         self.total_height = max(self.window_size, 700)
 
         # sensing radius (sửa cho hợp lý)
-        self.sensing_radius = 6
+        self.sensing_radius = 10
         self.sensing_radius_min = 1
         self.sensing_radius_max = 15
 
@@ -72,7 +78,8 @@ class CStarPygameVisualizer:
 
         # ---------- pygame ----------
         pygame.init()
-        self.screen = pygame.display.set_mode((self.total_width, self.total_height))
+        self.screen = pygame.display.set_mode(
+            (self.total_width, self.total_height))
         pygame.display.set_caption("C* Algorithm Visualization - Pygame")
         self.clock = pygame.time.Clock()
 
@@ -183,11 +190,15 @@ class CStarPygameVisualizer:
         self.ui.buttons['pause']['text'] = 'Pause'
 
         def run_c_star():
-            c_star = CStar(self.grid, self.robot_pos, sensing_radius=self.sensing_radius)
+            c_star = CStar(self.grid, self.robot_pos,
+                           sensing_radius=self.sensing_radius)
             c_star.set_callbacks(
-                step_callback=lambda *args, **kwargs: update_display(self, *args, **kwargs),
-                rcg_update_callback=lambda *args, **kwargs: update_rcg_display(self, *args, **kwargs),
-                path_update_callback=lambda *args, **kwargs: update_path_display(self, *args, **kwargs),
+                step_callback=lambda *args, **kwargs: update_display(
+                    self, *args, **kwargs),
+                rcg_update_callback=lambda *args, **kwargs: update_rcg_display(
+                    self, *args, **kwargs),
+                path_update_callback=lambda *args, **kwargs: update_path_display(
+                    self, *args, **kwargs),
             )
             _, results = c_star.run()
             self.results = results
@@ -212,7 +223,8 @@ class CStarPygameVisualizer:
             self.panel_width, self.total_height,
             (self.font_large, self.font_medium, self.font_small), self.colors,
             self.step_count, self.robot_pos, self.covered_count,
-            len(self.current_path), len(self.rcg_nodes), len(self.frontier_nodes),
+            len(self.current_path), len(
+                self.rcg_nodes), len(self.frontier_nodes),
             self.ui.slider_rect, self.ui.slider_handle, self.step_size,
             self.ui.buttons, self.results, self.window_size
         )
@@ -237,9 +249,11 @@ class CStarPygameVisualizer:
         pygame.quit()
         sys.exit()
 
+
 if __name__ == '__main__':
     print("--- C* Algorithm Visualization (Pygame) ---")
     print("Grid Size: 50x50")
     print("Starting Pygame GUI...")
-    visualizer = CStarPygameVisualizer(grid_size=50, cell_size=12, step_size=0.01)
+    visualizer = CStarPygameVisualizer(
+        grid_size=50, cell_size=12, step_size=0.01)
     visualizer.run()
