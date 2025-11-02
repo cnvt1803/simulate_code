@@ -273,7 +273,7 @@ def boustrophedon_motion(
     def pick_dir_by_rule(rr, cc, main_axis, R, delta_penalty=0.6):
         """
         Trả về (dir_idx, new_axis) theo luật cảm biến có xét 'một bên quá xa'.
-        - Nếu hai phía của một trục đều 'seen' (gặp biên/chướng ngại trong R) → dùng tổng d làm score như cũ.
+        - Nếu hai phía của một trục đều 'seen' (gặp biên/chướng ngại trong R)
         - Nếu chỉ thấy một phía → dùng d_phía_thấy + (R * (1 - delta_penalty)) làm score mềm cho phía kia (bị phạt).
         - Khi đã chốt trục, chọn hướng có d NGẮN HƠN (giảm roll-in).
         """

@@ -87,7 +87,9 @@ class PygameVisualizer:
         self.dragging_slider = False
 
         self.setup_ui_elements()
-        self.add_sample_obstacles()
+        # self.add_sample_obstacles()
+        self.set_fixed_map_layout()
+
 
     def setup_ui_elements(self):
         """Setup UI buttons and elements"""
@@ -143,6 +145,34 @@ class PygameVisualizer:
             c = random.randint(10, self.grid_size - 10)
             if self.grid[r][c] == FREE_UNCOVERED:
                 self.grid[r][c] = OBSTACLE
+
+    def set_fixed_map_layout(self):
+        MAP_20 = [
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "......#########.....",
+            "......##########....",
+            "......##########....",
+            "......##########....",
+            "......##########....",
+            "......##########....",
+            "......##............",
+            "......##............",
+            "......###.#####.....",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+        ]
+        for r, row in enumerate(MAP_20):
+            for c, ch in enumerate(row):
+                self.grid[r][c] = OBSTACLE if ch == "#" else FREE_UNCOVERED
+
 
     def handle_events(self):
         """Handle pygame events"""
@@ -262,8 +292,8 @@ class PygameVisualizer:
             self.selected_backtracking_points = []
             self.current_astar_path = []
             self.is_paused = False
-            self.add_sample_obstacles()
-
+            # self.add_sample_obstacles()
+            self.set_fixed_map_layout()
             # Reset buttons
             self.buttons['start']['enabled'] = True
             self.buttons['pause']['enabled'] = False
