@@ -1,0 +1,2 @@
+thêm cái vừa di chuyển hole vừa phát hiện tiếp (với điều kiện hole k nằm cùng hướng di chuyêbr)
+chỉnh lại cờ phát hiện 

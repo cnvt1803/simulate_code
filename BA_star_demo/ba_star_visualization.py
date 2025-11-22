@@ -1,8 +1,3 @@
-"""
-BA* Algorithm Visualization using Pygame
-Provides better performance and smoother rendering compared to tkinter
-"""
-
 import pygame
 import sys
 import threading
@@ -17,22 +12,36 @@ class PygameVisualizer:
         self.cell_size = cell_size
         self.step_size = step_size
         self.window_size = grid_size * cell_size
-        self.panel_width = 250
+    # Make the visualizer wider and taller so the info panel can show full details
+        self.panel_width = 380  # increased panel width for more information
         self.total_width = self.window_size + self.panel_width
-        self.total_height = max(self.window_size, 600)
+    # Increase minimum height so the panel can display all controls and stats
+        self.total_height = max(self.window_size, 800)
 
         # Game state
         self.is_paused = False
         self.is_running = False
         self.algorithm_running = False
         # sensing radius
-        self.sensor_radius = 15  # bán kính r theo đơn vị Ô
+        self.sensor_radius = 7  # bán kính r theo đơn vị Ô
         self.show_sensor = True
         # Path tracking for visualization
         self.coverage_paths = []  # List of coverage paths with different colors
         # Only show selected backtracking points
         self.selected_backtracking_points = []
         self.current_astar_path = []
+        # final path metrics (movement cost and turn count)
+        self.final_path = []
+        self.resume_points = []
+        self.last_path_cost = 0.0
+        self.last_path_turns = 0
+        # Live tracking of robot movement to update turns as the robot moves
+        self._prev_move_live = None  # previous movement vector (dx, dy)
+        self.live_turns = 0
+        # Sensor scan highlight timing
+        self._last_sensor_scan_ts = 0.0
+        # seconds to keep highlight visible after a scan
+        self._sensor_highlight_duration = 0.6
         self.path_colors = [
             (0, 100, 255),      # Blue
             (128, 0, 128),      # Purple
@@ -90,7 +99,22 @@ class PygameVisualizer:
         self.dragging_slider = False
 
         self.setup_ui_elements()
-        self.add_sample_obstacles()
+        # Which map to load by default: 0=empty/sample, 1=layout01, 2=layout02, 3=layout03
+        self.current_map_index = 3  # default: 3 (you can set 0/1/2/3)
+
+        # load the default map
+        self.set_map_by_index(self.current_map_index)
+
+        # self.add_sample_obstacles()
+        # self.set_fixed_map_layout()
+        # self.set_fixed_map_layout0()
+        # self.set_fixed_map_layout01()
+        # self.set_fixed_map_layout02()
+        # self.set_fixed_map_layout03()
+
+    def show_resume_point(self, point):
+        if point not in self.resume_points:
+            self.resume_points.append(point)
 
     def setup_ui_elements(self):
         """Setup UI buttons and elements"""
@@ -147,6 +171,203 @@ class PygameVisualizer:
             if self.grid[r][c] == FREE_UNCOVERED:
                 self.grid[r][c] = OBSTACLE
 
+    def set_fixed_map_layout(self):
+        MAP_20 = [
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            ".........####.......",
+            ".........####.......",
+            ".......###..........",
+            ".......###..........",
+            "....................",
+            ".....##....##.......",
+            ".....#.##..##.......",
+            ".....#.#..###.......",
+            "........#...........",
+            ".......####.........",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+        ]
+        for r, row in enumerate(MAP_20):
+            for c, ch in enumerate(row):
+                self.grid[r][c] = OBSTACLE if ch == "#" else FREE_UNCOVERED
+
+    def set_fixed_map_layout_main(self):  # ! vấn đề sửa
+        MAP_20 = [
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "......#########.....",
+            "......##########....",
+            "......##########....",
+            "......##########....",
+            "......##########....",
+            "......##########....",
+            "......##............",
+            "......##............",
+            "......###.#####.....",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+        ]
+        for r, row in enumerate(MAP_20):
+            for c, ch in enumerate(row):
+                self.grid[r][c] = OBSTACLE if ch == "#" else FREE_UNCOVERED
+
+    def set_fixed_map_layout0(self):  # ! vấn đề sửa
+        MAP_20 = [
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            ".....###............",
+            ".....###.#####......",
+            ".....##..#####......",
+            ".....##..#####......",
+            ".....##..#####......",
+            ".........#####......",
+            "...........##.......",
+            "......####.###......",
+            "......####.###......",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+        ]
+        for r, row in enumerate(MAP_20):
+            for c, ch in enumerate(row):
+                self.grid[r][c] = OBSTACLE if ch == "#" else FREE_UNCOVERED
+
+    def set_fixed_map_layout01(self):
+        MAP_20 = [
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....###..#####......",
+            "....###..######.....",
+            "....###..######.....",
+            "....###########.....",
+            "......#########.....",
+            "......#########.....",
+            "........#######.....",
+            "........######......",
+            "........######......",
+            "........######......",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+        ]
+        for r, row in enumerate(MAP_20):
+            for c, ch in enumerate(row):
+                self.grid[r][c] = OBSTACLE if ch == "#" else FREE_UNCOVERED
+
+    def set_fixed_map_layout02(self):
+        MAP_20 = [
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "........######......",
+            "......########......",
+            "......####..........",
+            ".......#######......",
+            "..........####......",
+            "......########......",
+            "......########......",
+            "......########......",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+        ]
+        for r, row in enumerate(MAP_20):
+            for c, ch in enumerate(row):
+                self.grid[r][c] = OBSTACLE if ch == "#" else FREE_UNCOVERED
+
+    def set_fixed_map_layout03(self):
+        MAP_20 = [
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            ".....#####..........",
+            ".....########.......",
+            ".....########.......",
+            ".....########.......",
+            ".....##.#####.......",
+            ".....##..####.......",
+            ".....##..#..........",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+        ]
+        for r, row in enumerate(MAP_20):
+            for c, ch in enumerate(row):
+                self.grid[r][c] = OBSTACLE if ch == "#" else FREE_UNCOVERED
+
+    def set_map_by_index(self, idx):
+        """Set grid layout by index: 0=empty/sample, 1=layout01, 2=layout02, 3=layout03."""
+        self.current_map_index = idx
+        # reset grid to empty first
+        self.grid = [[FREE_UNCOVERED for _ in range(
+            self.grid_size)] for _ in range(self.grid_size)]
+        if idx == 0:
+            # default sample/random
+            self.add_sample_obstacles()
+        elif idx == 1:
+            # layout01 corresponds to set_fixed_map_layout01
+            try:
+                self.set_fixed_map_layout01()
+            except Exception:
+                pass
+        elif idx == 2:
+            try:
+                self.set_fixed_map_layout02()
+            except Exception:
+                pass
+        elif idx == 3:
+            try:
+                self.set_fixed_map_layout03()
+            except Exception:
+                pass
+        # reset robot pos & counters
+        self.robot_pos = (0, 0)
+        self.step_count = 0
+        self.covered_count = sum(row.count(COVERED) for row in self.grid)
+        # clear visualization buffers
+        self.coverage_paths = []
+        self.current_astar_path = []
+        self.selected_backtracking_points = []
+        self.resume_points = []
+
     def handle_events(self):
         """Handle pygame events"""
         for event in pygame.event.get():
@@ -191,6 +412,24 @@ class PygameVisualizer:
                 elif event.key == pygame.K_MINUS:
                     # Giảm bán kính cảm biến
                     self.sensor_radius = max(0, self.sensor_radius - 1)
+                elif event.key == pygame.K_1:
+                    # load layout01
+                    if not self.algorithm_running:
+                        self.set_map_by_index(1)
+                elif event.key == pygame.K_2:
+                    if not self.algorithm_running:
+                        self.set_map_by_index(2)
+                elif event.key == pygame.K_3:
+                    if not self.algorithm_running:
+                        self.set_map_by_index(3)
+                elif event.key == pygame.K_0:
+                    if not self.algorithm_running:
+                        self.set_map_by_index(0)
+                elif event.key == pygame.K_m:
+                    # cycle maps 0->1->2->3->0
+                    if not self.algorithm_running:
+                        next_idx = (self.current_map_index + 1) % 4
+                        self.set_map_by_index(next_idx)
 
         return True
 
@@ -241,6 +480,11 @@ class PygameVisualizer:
     def start_algorithm(self):
         """Start the BA* algorithm in a separate thread"""
         if not self.algorithm_running:
+            # Reset live movement metrics at algorithm start
+            self._prev_move_live = None
+            self.live_turns = 0
+            self.last_path_turns = 0
+
             self.algorithm_running = True
             self.buttons['start']['enabled'] = False
             self.buttons['pause']['enabled'] = True
@@ -248,8 +492,8 @@ class PygameVisualizer:
             self.buttons['pause']['text'] = 'Pause'
 
             def run_ba_star():
-                ba_star_robot = BAStar(
-                    self.grid, self.robot_pos, sensor_radius=self.sensor_radius)
+                # Create BA* instance (BAStar expects initial_grid, start_pos)
+                ba_star_robot = BAStar(self.grid, self.robot_pos)
 
                 # Set up callbacks for visualization
                 ba_star_robot.set_callbacks(
@@ -257,8 +501,41 @@ class PygameVisualizer:
                     backtrack_callback=self.show_selected_backtracking_point,
                     astar_callback=self.show_astar_path
                 )
-
+                ba_star_robot.on_resume_callback = self.show_resume_point
                 final_path, final_grid = ba_star_robot.run()
+
+                # After algorithm finishes, compute movement cost and turns
+                # Rule: straight = 1.0 point, turn = 0.5 point
+                try:
+                    if final_path and len(final_path) > 1:
+                        total_score = 0.0
+                        turns = 0
+                        prev_move = None
+                        for i in range(1, len(final_path)):
+                            r0, c0 = final_path[i-1]
+                            r1, c1 = final_path[i]
+                            dx = r1 - r0
+                            dy = c1 - c0
+                            if prev_move is None:
+                                total_score += 1.0
+                            else:
+                                if dx == prev_move[0] and dy == prev_move[1]:
+                                    total_score += 1.0
+                                else:
+                                    total_score += 0.5
+                                    turns += 1
+                            prev_move = (dx, dy)
+                        self.last_path_cost = total_score
+                        self.last_path_turns = turns
+                        self.final_path = final_path
+                    else:
+                        self.last_path_cost = 0.0
+                        self.last_path_turns = 0
+                        self.final_path = final_path
+                except Exception:
+                    self.last_path_cost = 0.0
+                    self.last_path_turns = 0
+                    self.final_path = final_path
 
                 # Algorithm completed
                 self.algorithm_running = False
@@ -281,9 +558,14 @@ class PygameVisualizer:
             self.coverage_paths = []
             self.selected_backtracking_points = []
             self.current_astar_path = []
+            self.resume_points = []
             self.is_paused = False
+            # reset live movement metrics
+            self._prev_move_live = None
+            self.live_turns = 0
+            self.last_path_turns = 0
             self.add_sample_obstacles()
-
+            # self.set_fixed_map_layout()
             # Reset buttons
             self.buttons['start']['enabled'] = True
             self.buttons['pause']['enabled'] = False
@@ -304,9 +586,55 @@ class PygameVisualizer:
         if not self.is_running or not self.algorithm_running:
             return
 
+    # Capture old robot position and grid to detect movement vector and sensor scans
+        old_robot_pos = self.robot_pos
+        old_grid = [row[:] for row in self.grid]
+
         self.grid = [row[:] for row in new_grid]
         self.robot_pos = robot_pos
         self.step_count += 1
+
+        # Live turn detection: increment when robot changes movement direction
+        try:
+            if old_robot_pos is not None and self.robot_pos is not None:
+                if old_robot_pos != self.robot_pos:
+                    r0, c0 = old_robot_pos
+                    r1, c1 = self.robot_pos
+                    move = (r1 - r0, c1 - c0)
+                    # Only consider non-zero moves
+                    if move != (0, 0):
+                        if self._prev_move_live is None:
+                            self._prev_move_live = move
+                        else:
+                            if move != self._prev_move_live:
+                                self.live_turns += 1
+                                self._prev_move_live = move
+            # Keep last_path_turns in sync so panel shows live value
+            self.last_path_turns = self.live_turns
+        except Exception:
+            # Don't crash the visualizer on unexpected coordinate shapes
+            pass
+
+        # Detect sensor scan: if any cell within sensor radius changed from non-COVERED to COVERED
+        try:
+            if self.show_sensor and self.sensor_radius > 0:
+                rr, rc = self.robot_pos
+                rmin = max(0, rr - self.sensor_radius)
+                rmax = min(self.grid_size - 1, rr + self.sensor_radius)
+                cmin = max(0, rc - self.sensor_radius)
+                cmax = min(self.grid_size - 1, rc + self.sensor_radius)
+                scanned = False
+                for r in range(rmin, rmax + 1):
+                    for c in range(cmin, cmax + 1):
+                        if old_grid[r][c] != COVERED and self.grid[r][c] == COVERED:
+                            scanned = True
+                            break
+                    if scanned:
+                        break
+                if scanned:
+                    self._last_sensor_scan_ts = time.time()
+        except Exception:
+            pass
 
         # Update coverage path if provided
         if coverage_path is not None:
@@ -328,6 +656,13 @@ class PygameVisualizer:
 
     def show_selected_backtracking_point(self, selected_point):
         """Show only the selected backtracking point when it's chosen for navigation"""
+        # When a backtracking point is selected the robot will change its navigation
+        # Reset live-move tracking so that the turn counter restarts from zero
+        # (this prevents arbitrary large jumps from being counted as turns)
+        self._prev_move_live = None
+        self.live_turns = 0
+        self.last_path_turns = 0
+
         if selected_point not in self.selected_backtracking_points:
             self.selected_backtracking_points.append(selected_point)
 
@@ -336,6 +671,35 @@ class PygameVisualizer:
         if astar_path not in self.current_astar_path:
             self.current_astar_path.append(astar_path.copy())
         time.sleep(0.5)  # Show A* path for a moment
+
+    def compute_path_metrics(self, path):
+        """Compute movement cost and number of turns for a given path.
+
+        Rules: straight = 1.0 point, change of direction (turn) = 0.5 point.
+        Returns (cost: float, turns: int).
+        """
+        if not path or len(path) <= 1:
+            return 0.0, 0
+
+        total_score = 0.0
+        turns = 0
+        prev_move = None
+        for i in range(1, len(path)):
+            r0, c0 = path[i-1]
+            r1, c1 = path[i]
+            dx = r1 - r0
+            dy = c1 - c0
+            if prev_move is None:
+                total_score += 1.0
+            else:
+                if dx == prev_move[0] and dy == prev_move[1]:
+                    total_score += 1.0
+                else:
+                    total_score += 0.5
+                    turns += 1
+            prev_move = (dx, dy)
+
+        return total_score, turns
 
     def draw_grid(self):
         """Draw the main grid"""
@@ -418,10 +782,36 @@ class PygameVisualizer:
             pygame.draw.polygon(
                 grid_surface, self.colors['dark_red'], points, 2)
 
+        # vẽ resume points (màu xanh lá)
+        for r, c in self.resume_points:
+            cx = c * self.cell_size + self.cell_size // 2
+            cy = r * self.cell_size + self.cell_size // 2
+            size = self.cell_size // 3
+            points = [(cx, cy-size), (cx+size, cy),
+                      (cx, cy+size), (cx-size, cy)]
+            pygame.draw.polygon(grid_surface, self.colors['green'], points)
+            pygame.draw.polygon(
+                grid_surface, self.colors['dark_green'], points, 2)
+
         # 6) Robot (vẽ cuối cùng để nằm trên cùng)
         robot_r, robot_c = self.robot_pos
         robot_x = robot_c * self.cell_size + self.cell_size // 2
         robot_y = robot_r * self.cell_size + self.cell_size // 2
+        # Highlight the cell the robot stands on only briefly when a sensor scan just occurred
+        try:
+            now_ts = time.time()
+            if self._last_sensor_scan_ts and (now_ts - self._last_sensor_scan_ts) < self._sensor_highlight_duration:
+                highlight = pygame.Surface(
+                    (self.cell_size, self.cell_size), pygame.SRCALPHA)
+                # semi-transparent highlight colour
+                highlight.fill((*self.colors['sensor_yellow'], 140))
+                top_left_x = robot_c * self.cell_size
+                top_left_y = robot_r * self.cell_size
+                grid_surface.blit(highlight, (top_left_x, top_left_y))
+        except Exception:
+            # fall back silently if drawing fails
+            pass
+
         self.draw_robot_car(grid_surface, robot_x, robot_y)
 
         return grid_surface
@@ -487,11 +877,35 @@ class PygameVisualizer:
         panel_surface.blit(title_text, (20, y_offset))
         y_offset += 40
 
+        # Compute which path metrics to show (prefer live/current path while running)
+        display_cost = getattr(self, 'last_path_cost', 0.0)
+        display_turns = getattr(self, 'last_path_turns', 0)
+
+        # If algorithm is running, prefer showing the most recent A* preview path
+        if self.algorithm_running:
+            if self.current_astar_path:
+                try:
+                    pcost, pturns = self.compute_path_metrics(
+                        self.current_astar_path[-1])
+                    display_cost = pcost
+                    display_turns = pturns
+                except Exception:
+                    pass
+            elif self.final_path:
+                try:
+                    pcost, pturns = self.compute_path_metrics(self.final_path)
+                    display_cost = pcost
+                    display_turns = pturns
+                except Exception:
+                    pass
+
         # Information display
         info_texts = [
             f"Step: {self.step_count}",
             f"Position: {self.robot_pos}",
             f"Covered: {self.covered_count}",
+            f"Path cost: {display_cost:.2f}",
+            f"Turns: {display_turns}",
             "",
             "Speed Control:",
         ]
@@ -554,26 +968,107 @@ class PygameVisualizer:
             panel_surface.blit(legend_text, (20, legend_y))
             legend_y += 20
 
-        # Controls
-        controls_y = legend_y + 20
-        controls_title = self.font_medium.render(
-            "Controls:", True, self.colors['black'])
-        panel_surface.blit(controls_title, (20, controls_y))
-        controls_y += 30
+        # Layout spacing configuration
+        section_spacing = 20
+        # Controls section removed per user request; start next section after legend
+        current_y = legend_y + section_spacing
 
-        control_items = [
-            "SPACE: Pause/Resume",
-            "S: Start Algorithm",
-            "R: Reset Grid",
-            "V: Toggle Sensor Overlay",
-            "+ / -: Increase/Decrease Radius",
-        ]
+        # Compute total length of all paths:
+        # - coverage_paths: full robot coverage movements
+        # - current_astar_path: A* preview/backtrack paths shown
+        # - final_path: final planned path
+        try:
+            total_length = 0
+            for p in self.coverage_paths:
+                if p:
+                    total_length += len(p)
+            for p in self.current_astar_path:
+                if p:
+                    total_length += len(p)
+            if getattr(self, 'final_path', None):
+                total_length += len(self.final_path)
+        except Exception:
+            total_length = 0
 
-        for text in control_items:
-            control_text = self.font_small.render(
-                text, True, self.colors['dark_gray'])
-            panel_surface.blit(control_text, (20, controls_y))
-            controls_y += 20
+        total_text = self.font_small.render(
+            "Total length of paths: {}".format(total_length), True, self.colors['black'])
+        panel_surface.blit(total_text, (20, current_y))
+
+        current_y += section_spacing
+
+        # Backtracking points chosen (render in a row, wrap if necessary)
+        bt_title = self.font_small.render(
+            "Backtracking points chosen:", True, self.colors['black'])
+        panel_surface.blit(bt_title, (20, current_y))
+        current_y += section_spacing
+
+        try:
+            max_show = 50
+            total_bt = len(self.selected_backtracking_points)
+            x = 30
+            y = current_y
+            wrap_limit = self.panel_width - 40
+            shown = 0
+            for pt in self.selected_backtracking_points[:max_show]:
+                pt_str = str(pt)
+                pt_surface = self.font_small.render(
+                    pt_str, True, self.colors['dark_gray'])
+                pw = pt_surface.get_width()
+                if x + pw > wrap_limit:
+                    # wrap to next line
+                    x = 30
+                    y += 18
+                panel_surface.blit(pt_surface, (x, y))
+                x += pw + 8
+                shown += 1
+
+            if total_bt > shown:
+                more_text = f"... and {total_bt - shown} more"
+                more_surface = self.font_small.render(
+                    more_text, True, self.colors['dark_gray'])
+                if x + more_surface.get_width() > wrap_limit:
+                    x = 30
+                    y += 18
+                panel_surface.blit(more_surface, (x, y))
+                y += 18
+
+            current_y = y + section_spacing
+        except Exception:
+            # fallback: single-line dump
+            try:
+                fallback = self.font_small.render(
+                    str(self.selected_backtracking_points), True, self.colors['dark_gray'])
+                panel_surface.blit(fallback, (30, current_y))
+                current_y += 18
+            except Exception:
+                pass
+
+        # Total turns across all stored paths (coverage paths + recent A* previews + final path)
+        total_turns_all = 0
+        try:
+            # coverage paths
+            for path in self.coverage_paths:
+                if path:
+                    _, t = self.compute_path_metrics(path)
+                    total_turns_all += int(t)
+
+            # current A* preview paths
+            for path in self.current_astar_path:
+                if path:
+                    _, t = self.compute_path_metrics(path)
+                    total_turns_all += int(t)
+
+            # final computed path
+            if getattr(self, 'final_path', None):
+                _, t = self.compute_path_metrics(self.final_path)
+                total_turns_all += int(t)
+        except Exception:
+            total_turns_all = getattr(self, 'last_path_turns', 0)
+
+        total_text2 = self.font_small.render(
+            f"Total turns (all paths): {total_turns_all}", True, self.colors['black'])
+        panel_surface.blit(total_text2, (20, current_y))
+        current_y += section_spacing
 
         return panel_surface
 

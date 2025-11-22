@@ -1,0 +1,147 @@
+[INIT] pos=(0, 0) R0=7 dN=0 dS=7 dE=7 dW=0
+[INIT] main_axis=NS, long_dir=1, side_dir=2
+  N: steps=0, seen=True
+  S: steps=0, seen=True
+  E: steps=2, seen=True
+  W: steps=0, seen=True
+  -> score_NS=0 (known=True), score_EW=2 (known=True)
+  main_axis=NS
+[BT] pick_dir try penalty=0.6 -> new_axis=EW
+[BT] attempt axis switch NS->EW (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral
+[INIT] pos=(14, 7) R0=7 dN=0 dS=0 dE=7 dW=0
+[INIT] main_axis=EW, long_dir=2, side_dir=0
+  N: steps=2, seen=True
+  S: steps=0, seen=True
+  E: steps=0, seen=True
+  W: steps=0, seen=True
+  -> score_NS=2 (known=True), score_EW=0 (known=True)
+  main_axis=EW
+[BT] pick_dir try penalty=0.6 -> new_axis=NS
+[BT] attempt axis switch EW->NS (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral
+[INIT] pos=(14, 19) R0=7 dN=0 dS=5 dE=0 dW=0
+[INIT] main_axis=NS, long_dir=1, side_dir=2
+  N: steps=0, seen=True
+  S: steps=0, seen=True
+  E: steps=0, seen=True
+  W: steps=7, seen=False
+  -> score_NS=0 (known=True), score_EW=2.8000000000000003 (known=False)
+  main_axis=NS
+[BT] pick_dir try penalty=0.6 -> new_axis=EW
+[BT] attempt axis switch NS->EW (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral
+[INIT] pos=(6, 4) R0=7 dN=0 dS=0 dE=1 dW=0
+[INIT] main_axis=EW, long_dir=2, side_dir=0
+[INIT] pos=(5, 16) R0=7 dN=0 dS=5 dE=0 dW=0
+[INIT] main_axis=NS, long_dir=1, side_dir=2
+  N: steps=0, seen=True
+  S: steps=0, seen=True
+  E: steps=2, seen=True
+  W: steps=0, seen=True
+  -> score_NS=0 (known=True), score_EW=2 (known=True)
+  main_axis=NS
+[BT] pick_dir try penalty=0.6 -> new_axis=EW
+[BT] attempt axis switch NS->EW (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral
+[INIT] pos=(0, 0) R0=7 dN=0 dS=7 dE=7 dW=0
+[INIT] main_axis=NS, long_dir=1, side_dir=2
+  N: steps=0, seen=True
+  S: steps=0, seen=True
+  E: steps=7, seen=False
+  W: steps=0, seen=True
+  -> score_NS=0 (known=True), score_EW=2.8000000000000003 (known=False)
+  main_axis=NS
+[BT] pick_dir try penalty=0.6 -> new_axis=EW
+[BT] attempt axis switch NS->EW (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral
+[INIT] pos=(13, 11) R0=7 dN=0 dS=0 dE=7 dW=0
+[INIT] main_axis=EW, long_dir=2, side_dir=0
+  N: steps=4, seen=True
+  S: steps=0, seen=True
+  E: steps=0, seen=True
+  W: steps=0, seen=True
+  -> score_NS=4 (known=True), score_EW=0 (known=True)
+  main_axis=EW
+[BT] pick_dir try penalty=0.6 -> new_axis=NS
+[BT] attempt axis switch EW->NS (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral
+[INIT] pos=(13, 19) R0=7 dN=0 dS=6 dE=0 dW=0
+[INIT] main_axis=NS, long_dir=1, side_dir=2
+  N: steps=0, seen=True
+  S: steps=0, seen=True
+  E: steps=0, seen=True
+  W: steps=6, seen=True
+  -> score_NS=0 (known=True), score_EW=6 (known=True)
+  main_axis=NS
+[BT] pick_dir try penalty=0.6 -> new_axis=EW
+[BT] attempt axis switch NS->EW (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral
+[INIT] pos=(5, 4) R0=7 dN=0 dS=0 dE=7 dW=0
+[INIT] main_axis=EW, long_dir=2, side_dir=0
+  N: steps=4, seen=True
+  S: steps=0, seen=True
+  E: steps=0, seen=True
+  W: steps=0, seen=True
+  -> score_NS=4 (known=True), score_EW=0 (known=True)
+  main_axis=EW
+[BT] pick_dir try penalty=0.6 -> new_axis=NS
+[BT] attempt axis switch EW->NS (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral
+[INIT] pos=(5, 15) R0=7 dN=0 dS=2 dE=0 dW=0
+[INIT] main_axis=NS, long_dir=1, side_dir=2
+  N: steps=0, seen=True
+  S: steps=0, seen=True
+  E: steps=3, seen=True
+  W: steps=0, seen=True
+  -> score_NS=0 (known=True), score_EW=3 (known=True)
+  main_axis=NS
+[BT] pick_dir try penalty=0.6 -> new_axis=EW
+[BT] attempt axis switch NS->EW (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral
+[INIT] pos=(0, 0) R0=7 dN=0 dS=7 dE=7 dW=0
+[INIT] main_axis=NS, long_dir=1, side_dir=2
+  N: steps=0, seen=True
+  S: steps=0, seen=True
+  E: steps=2, seen=True
+  W: steps=0, seen=True
+  -> score_NS=0 (known=True), score_EW=2 (known=True)
+  main_axis=NS
+[BT] pick_dir try penalty=0.6 -> new_axis=EW
+[BT] attempt axis switch NS->EW (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral
+[INIT] pos=(14, 7) R0=7 dN=0 dS=0 dE=7 dW=0
+[INIT] main_axis=EW, long_dir=2, side_dir=0
+  N: steps=2, seen=True
+  S: steps=0, seen=True
+  E: steps=0, seen=True
+  W: steps=0, seen=True
+  -> score_NS=2 (known=True), score_EW=0 (known=True)
+  main_axis=EW
+[BT] pick_dir try penalty=0.6 -> new_axis=NS
+[BT] attempt axis switch EW->NS (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral
+[INIT] pos=(14, 19) R0=7 dN=0 dS=5 dE=0 dW=0
+[INIT] main_axis=NS, long_dir=1, side_dir=2
+  N: steps=0, seen=True
+  S: steps=0, seen=True
+  E: steps=0, seen=True
+  W: steps=7, seen=False
+  -> score_NS=0 (known=True), score_EW=2.8000000000000003 (known=False)
+  main_axis=NS
+[BT] pick_dir try penalty=0.6 -> new_axis=EW
+[BT] attempt axis switch NS->EW (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral
+[INIT] pos=(6, 4) R0=7 dN=0 dS=0 dE=1 dW=0
+[INIT] main_axis=EW, long_dir=2, side_dir=0
+[INIT] pos=(5, 16) R0=7 dN=0 dS=5 dE=0 dW=0
+[INIT] main_axis=NS, long_dir=1, side_dir=2
+  N: steps=0, seen=True
+  S: steps=0, seen=True
+  E: steps=2, seen=True
+  W: steps=0, seen=True
+  -> score_NS=0 (known=True), score_EW=2 (known=True)
+  main_axis=NS
+[BT] pick_dir try penalty=0.6 -> new_axis=EW
+[BT] attempt axis switch NS->EW (penalty=0.6)
+[BT] switch reverted in single-lateral case; fallback to lateral

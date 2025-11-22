@@ -253,7 +253,6 @@ def boustrophedon_motion(
         # fallback tổng quát nếu không khớp (vẫn đúng về nguyên tắc)
         return table.get((long_dir, side_dir), (side_dir, opposite(long_dir)))
 
-    # --- sensing (chỉ dùng khi cần đổi trục) ---
     def sense_one_dir(rr, cc, dr, dc, R):
         if R <= 0:
             return 0, False
@@ -264,7 +263,7 @@ def boustrophedon_motion(
             if not (0 <= x < rows and 0 <= y < cols):
                 seen = True
                 break
-            if grid[x][y] == OBSTACLE:
+            if grid[x][y] == OBSTACLE or grid[x][y] == COVERED:
                 seen = True
                 break
             steps += 1
@@ -346,27 +345,28 @@ def boustrophedon_motion(
     prev_lap = 0
     cur_lap = 0
 
+    dir_idx, main_axis = pick_dir_by_rule(
+        r, c, main_axis, sensor_radius)
     # chọn long_dir đầu: cố đi thẳng theo trục chính
     if main_axis == "NS":
-        if is_free(r-1, c):
-            long_dir = 0  # lên
-        elif is_free(r+1, c):
-            long_dir = 1  # xuống
+        if not is_free(r-1, c):
+            long_dir = 1  # lên
+        elif not is_free(r+1, c):
+            long_dir = 0  # xuống
         else:
-            long_dir = 0
+            long_dir = 1
         side_dir = 2  # E
     else:
-        if is_free(r, c+1):
-            long_dir = 2  # phải
-        elif is_free(r, c-1):
-            long_dir = 3  # trái
+        if not is_free(r, c+1):
+            long_dir = 3  # phải
+        elif not is_free(r, c-1):
+            long_dir = 2  # trái
         else:
-            long_dir = 2
+            long_dir = 3
         side_dir = 0  # N
 
     going_longitudinal = True
-    switch_lock = 0  # >0 nghĩa là vừa đổi trục, bắt buộc đi dọc >=1 bước trước khi xét rẽ
-
+    switch_lock = 0
     # mark start
     if grid[r][c] == FREE_UNCOVERED:
         grid[r][c] = COVERED
@@ -398,130 +398,128 @@ def boustrophedon_motion(
             # === ĐANG Ở BIÊN CỦA LUỐNG ===
             # Nếu vừa đổi trục và chưa đi được 1 bước dọc → chặn mọi rẽ để tránh lật side_dir
             if switch_lock > 0:
-                return (r, c), grid, coverage_path
+                # return (r, c), grid, coverage_path
+                switch_lock -= 1
+                continue
 
             # Đếm số hướng rẽ có thể đi 1 ô
-            lateral = []
-            for sd in (side_dir, opposite(side_dir)):
-                sdr, sdc = DIRECTIONS_BM[sd]
-                if is_free(r + sdr, c + sdc):
-                    lateral.append(sd)
+        lateral = []
+        for sd in (side_dir, opposite(side_dir)):
+            sdr, sdc = DIRECTIONS_BM[sd]
+            if is_free(r + sdr, c + sdc):
+                lateral.append(sd)
 
-            if len(lateral) == 2:
-                # Rẽ theo side_dir
-                sd = side_dir
-                sdr, sdc = DIRECTIONS_BM[sd]
-                r, c = r + sdr, c + sdc
+        if len(lateral) == 2:
+            # Rẽ theo side_dir
+            sd = opposite(side_dir)
+            sdr, sdc = DIRECTIONS_BM[sd]
+            r, c = r + sdr, c + sdc
+            grid[r][c] = COVERED
+            coverage_path.append((r, c))
+            if callback:
+                callback(grid, (r, c), coverage_path, coverage_id)
+
+            # Hoàn tất luống cũ
+            prev_lap = cur_lap
+            cur_lap = 0
+
+            # Quay đầu cho luống mới + giữ mẫu snake
+            long_dir = opposite(long_dir)
+            side_dir = opposite(sd)
+
+            # --- ROLL-IN: trượt ngang thêm cho đến khi ô dọc phía trước trống ---
+            # GIỮ hướng ngang vừa rẽ
+            slide_dr, slide_dc = DIRECTIONS_BM[sd]
+            ldr, ldc = DIRECTIONS_BM[long_dir]
+            while not is_free(r + ldr, c + ldc) and is_free(r + slide_dr, c + slide_dc):
+                r += slide_dr
+                c += slide_dc
                 grid[r][c] = COVERED
                 coverage_path.append((r, c))
                 if callback:
                     callback(grid, (r, c), coverage_path, coverage_id)
 
-                # Hoàn tất luống cũ
-                prev_lap = cur_lap
-                cur_lap = 0
-
-                # Quay đầu cho luống mới + giữ mẫu snake
-                long_dir = opposite(long_dir)
-                side_dir = opposite(sd)
-
-                # --- ROLL-IN: trượt ngang thêm cho đến khi ô dọc phía trước trống ---
-                # GIỮ hướng ngang vừa rẽ
-                slide_dr, slide_dc = DIRECTIONS_BM[sd]
-                ldr, ldc = DIRECTIONS_BM[long_dir]
-                while not is_free(r + ldr, c + ldc) and is_free(r + slide_dr, c + slide_dc):
-                    r += slide_dr
-                    c += slide_dc
-                    grid[r][c] = COVERED
-                    coverage_path.append((r, c))
-                    if callback:
-                        callback(grid, (r, c), coverage_path, coverage_id)
-
-                # Ép 1 bước dọc nếu có thể
-                if is_free(r + ldr, c + ldc):
-                    r += ldr
-                    c += ldc
-                    grid[r][c] = COVERED
-                    coverage_path.append((r, c))
-                    if callback:
-                        callback(grid, (r, c), coverage_path, coverage_id)
-                    cur_lap = 1
-
-                going_longitudinal = True
-                moved = True
-                continue
-
-            if len(lateral) == 1:
-                # Có 1 hướng rẽ → có thể cân nhắc đổi trục (cur<prev & có sensor)
-                if (cur_lap < prev_lap) and (sensor_radius > 0):
-                    dir_idx, new_axis = pick_dir_by_rule(
-                        r, c, main_axis, sensor_radius)
-                    if new_axis != main_axis:
-                        main_axis = new_axis
-                        prev_lap = cur_lap
-                        cur_lap = 0
-                        long_dir, side_dir = apply_axis_switch(
-                            long_dir, side_dir)
-                        # Khoá: phải đi dọc ít nhất 1 bước trước khi cho rẽ
-                        switch_lock = 1
-
-                        # cố gắng đi ngay 1 bước dọc
-                        ldr, ldc = DIRECTIONS_BM[long_dir]
-                        if is_free(r + ldr, c + ldc):
-                            r, c = r + ldr, c + ldc
-                            grid[r][c] = COVERED
-                            coverage_path.append((r, c))
-                            if callback:
-                                callback(grid, (r, c),
-                                         coverage_path, coverage_id)
-                            cur_lap = 1
-                            moved = True
-                            continue
-                        # nếu không đi được bước dọc → rẽ theo hướng duy nhất ở dưới
-
-                # Không đổi trục → rẽ theo hướng duy nhất rồi quay đầu
-                sd = lateral[0]
-
-                sdr, sdc = DIRECTIONS_BM[sd]
-                r, c = r + sdr, c + sdc
+            # Ép 1 bước dọc nếu có thể
+            if is_free(r + ldr, c + ldc):
+                r += ldr
+                c += ldc
                 grid[r][c] = COVERED
                 coverage_path.append((r, c))
                 if callback:
                     callback(grid, (r, c), coverage_path, coverage_id)
+                cur_lap = 1
 
-                # Hoàn tất luống cũ
-                prev_lap = cur_lap
-                cur_lap = 0
+            going_longitudinal = True
+            moved = True
+            continue
 
-                # Quay đầu cho luống mới + giữ mẫu snake
-                long_dir = opposite(long_dir)
-                side_dir = opposite(sd)
+        # ===== Trường hợp có 1 hướng rẽ =====
+        if len(lateral) == 1:
+            switched = False
+            if (cur_lap < prev_lap) and (sensor_radius > 0):
+                dir_idx, new_axis = pick_dir_by_rule(
+                    r, c, main_axis, sensor_radius)
+                if new_axis != main_axis:
+                    main_axis = new_axis
+                    prev_lap = cur_lap
+                    cur_lap = 0
+                    long_dir, side_dir = apply_axis_switch(
+                        long_dir, side_dir)
+                    # Khoá: phải đi dọc ít nhất 1 bước trước khi cho rẽ
+                    switch_lock = 1
 
-                # --- ROLL-IN tương tự ---
-                # GIỮ hướng ngang vừa rẽ
-                slide_dr, slide_dc = DIRECTIONS_BM[sd]
-                ldr, ldc = DIRECTIONS_BM[long_dir]
-                while not is_free(r + ldr, c + ldc) and is_free(r + slide_dr, c + slide_dc):
-                    r += slide_dr
-                    c += slide_dc
-                    grid[r][c] = COVERED
-                    coverage_path.append((r, c))
-                    if callback:
-                        callback(grid, (r, c), coverage_path, coverage_id)
+                    ldr, ldc = DIRECTIONS_BM[long_dir]
+                    if is_free(r + ldr, c + ldc):
+                        r, c = r + ldr, c + ldc
+                        grid[r][c] = COVERED
+                        coverage_path.append((r, c))
+                        if callback:
+                            callback(grid, (r, c), coverage_path, coverage_id)
+                        cur_lap = 1
+                        switched = True
 
-                # Ép 1 bước dọc nếu có thể
-                if is_free(r + ldr, c + ldc):
-                    r += ldr
-                    c += ldc
-                    grid[r][c] = COVERED
-                    coverage_path.append((r, c))
-                    if callback:
-                        callback(grid, (r, c), coverage_path, coverage_id)
-                    cur_lap = 1
-
+            if switched:
                 going_longitudinal = True
                 moved = True
                 continue
+
+            # Không đổi trục -> rẽ theo hướng duy nhất
+            sd = lateral[0]
+            sdr, sdc = DIRECTIONS_BM[sd]
+            r, c = r + sdr, c + sdc
+            grid[r][c] = COVERED
+            coverage_path.append((r, c))
+            if callback:
+                callback(grid, (r, c), coverage_path, coverage_id)
+
+            prev_lap = cur_lap
+            cur_lap = 0
+
+            long_dir = opposite(long_dir)
+            side_dir = opposite(sd)
+
+            # ROLL-IN
+            slide_dr, slide_dc = DIRECTIONS_BM[sd]
+            ldr, ldc = DIRECTIONS_BM[long_dir]
+            while not is_free(r + ldr, c + ldc) and is_free(r + slide_dr, c + slide_dc):
+                r += slide_dr
+                c += slide_dc
+                grid[r][c] = COVERED
+                coverage_path.append((r, c))
+                if callback:
+                    callback(grid, (r, c), coverage_path, coverage_id)
+            if is_free(r + ldr, c + ldc):
+                r += ldr
+                c += ldc
+                grid[r][c] = COVERED
+                coverage_path.append((r, c))
+                if callback:
+                    callback(grid, (r, c), coverage_path, coverage_id)
+                cur_lap = 1
+
+            going_longitudinal = True
+            moved = True
+            continue
 
         # Phòng hờ: nếu vì lý do nào đó thoát trạng thái dọc, thử 4 hướng ưu tiên
         for i, (dr, dc) in enumerate(DIRECTIONS_BM):
@@ -896,9 +894,8 @@ class BAStar:
             step += 1
 
         return self.total_path, self.grid
-
-
 # --- 7. Ví dụ Mô phỏng Console ---
+
 
 def print_grid(grid):
     """Hiển thị mô hình M."""

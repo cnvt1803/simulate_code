@@ -90,7 +90,6 @@ class PygameVisualizer:
         # self.add_sample_obstacles()
         self.set_fixed_map_layout()
 
-
     def setup_ui_elements(self):
         """Setup UI buttons and elements"""
         button_width = 120
@@ -172,7 +171,6 @@ class PygameVisualizer:
         for r, row in enumerate(MAP_20):
             for c, ch in enumerate(row):
                 self.grid[r][c] = OBSTACLE if ch == "#" else FREE_UNCOVERED
-
 
     def handle_events(self):
         """Handle pygame events"""
