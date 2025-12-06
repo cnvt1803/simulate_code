@@ -310,6 +310,7 @@ def find_adjacent_hole_rep(grid, r, c, max_bfs=500, sensor_radius=None, ignore_d
 
     return None
 
+
 def boustrophedon_motion(
     grid,
     start_pos,
@@ -549,7 +550,6 @@ def boustrophedon_motion(
 
     # --- Hàm 1: Xác định trạng thái bám tường ban đầu (Init) ---
 
-
     def determine_initial_wall_state(grid, r, c, long_dir):
         """
         Kiểm tra xem tại vị trí xuất phát, robot có đang sát tường không.
@@ -667,7 +667,7 @@ def boustrophedon_motion(
                 wall_side = right_sd
 
         return walking_along_wall, wall_side, should_check, reason
-    
+
     # ---------- init pattern ----------
     main_axis = "NS"
     prev_lap = 0
@@ -678,7 +678,6 @@ def boustrophedon_motion(
     main_axis = new_axis
 
     # Nếu dir_idx là hướng khả dụng (ô kế tiếp free) -> dùng luôn
-
 
     if dir_idx is not None and immediate_free(dir_idx):
         long_dir = dir_idx
@@ -812,14 +811,12 @@ def boustrophedon_motion(
 
                 continue  # Hết vòng lặp longitudinal
 
-
             # Đếm số hướng rẽ có thể đi 1 ô (hai bên lateral)
             lateral = []
             for sd in (side_dir, opposite(side_dir)):
                 sdr, sdc = DIRECTIONS_BM[sd]
                 if is_free(r + sdr, c + sdc):
                     lateral.append(sd)
-
 
             if len(lateral) == 2:
                 # Rẽ theo side_dir
@@ -869,7 +866,6 @@ def boustrophedon_motion(
                                 grid, r, c, max_bfs=2000, sensor_radius=sensor_radius, ignore_dir_index=long_dir)
                             if hole_rep:
                                 return (r, c), grid, coverage_path, hole_rep, long_dir
-
 
                     # 2. Nếu an toàn (hoặc không phát hiện hole), thực hiện bước đi
                     r, c = nr, nc
@@ -973,7 +969,6 @@ def boustrophedon_motion(
                                 grid, r, c, max_bfs=2000, sensor_radius=sensor_radius, ignore_dir_index=long_dir)
                             if hole_rep:
                                 return (r, c), grid, coverage_path, hole_rep, long_dir
-
 
                     # 2. Nếu an toàn (hoặc không phát hiện hole), thực hiện bước đi
                     r, c = nr, nc
@@ -1189,7 +1184,8 @@ class BAStar:
         b_s5_s4 = b_function(s5, s4)
         b_s7_s6 = b_function(s7, s6)
         b_s7_s8 = b_function(s7, s8)
-        mu_s = b_s1_s8 + b_s1_s2 + b_s3_s2 + b_s3_s4 + b_s5_s6 + b_s5_s4 + b_s7_s6 + b_s7_s8
+        mu_s = b_s1_s8 + b_s1_s2 + b_s3_s2 + b_s3_s4 + \
+            b_s5_s6 + b_s5_s4 + b_s7_s6 + b_s7_s8
         return mu_s
 
     def estimate_reachable_uncovered_area(self, start_r, start_c):
@@ -1546,6 +1542,7 @@ class BAStar:
 
         return True
     # ------------------ Main run (integrated hole handling) ------------------
+
     def run(self):
         print("--- Bắt đầu Thuật toán BA* ---")
         step = 1
@@ -1712,4 +1709,3 @@ class BAStar:
             step += 1
 
         return self.total_path, self.grid
-

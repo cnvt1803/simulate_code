@@ -325,37 +325,25 @@ class BAStar:
         return filtered_list
     
     def calculate_mu_function(self, neighbors):
-        """
-        Tính hàm μ(s) theo công thức (7):
-        μ(s) = b(s1,s8) + b(s1,s2) + b(s5,s6) + b(s5,s4) + b(s7,s6) + b(s7,s8)
-        
-        Trong đó b(si,sj) = 1 nếu (si is free) và (sj is blocked), ngược lại = 0
-        """
         def b_function(si_status, sj_status):
-            """
-            b(si,sj) = 1, if (si is free) and (sj is blocked); 0, otherwise
-            """
             return 1 if (si_status == FREE_UNCOVERED and sj_status == OBSTACLE) else 0
-        
-        # neighbors = [s1, s2, s3, s4, s5, s6, s7, s8]
-        # Chỉ số: s1=0, s2=1, s3=2, s4=3, s5=4, s6=5, s7=6, s8=7
-        
+
         if len(neighbors) != 8:
             return 0
-            
+
         s1, s2, s3, s4, s5, s6, s7, s8 = neighbors
-        
-        # Tính các thành phần của μ(s)
         b_s1_s8 = b_function(s1, s8)
         b_s1_s2 = b_function(s1, s2)
+        b_s3_s2 = b_function(s3, s2)
+        b_s3_s4 = b_function(s3, s4)
         b_s5_s6 = b_function(s5, s6)
         b_s5_s4 = b_function(s5, s4)
         b_s7_s6 = b_function(s7, s6)
         b_s7_s8 = b_function(s7, s8)
-        
-        mu_s = b_s1_s8 + b_s1_s2 + b_s5_s6 + b_s5_s4 + b_s7_s6 + b_s7_s8
-        
+        mu_s = b_s1_s8 + b_s1_s2 + b_s3_s2 + b_s3_s4 + \
+            b_s5_s6 + b_s5_s4 + b_s7_s6 + b_s7_s8
         return mu_s
+
     
     def estimate_reachable_uncovered_area(self, start_r, start_c):
         """

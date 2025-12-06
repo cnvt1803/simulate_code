@@ -251,7 +251,32 @@ class PygameVisualizer:
         for r, row in enumerate(MAP_20):
             for c, ch in enumerate(row):
                 self.grid[r][c] = OBSTACLE if ch == "#" else FREE_UNCOVERED
-
+    def set_fixed_map_layout3(self):
+        MAP_20 = [
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            ".....#####..........",
+            ".....########.......",
+            ".....########.......",
+            ".....########.......",
+            ".....##.#####.......",
+            ".....##..####.......",
+            ".....##..#..........",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+            "....................",
+        ]
+        for r, row in enumerate(MAP_20):
+            for c, ch in enumerate(row):
+                self.grid[r][c] = OBSTACLE if ch == "#" else FREE_UNCOVERED
     def set_fixed_map_layout01(self):
         MAP_20 = [
             "....................",
@@ -313,16 +338,16 @@ class PygameVisualizer:
             "....................",
             "....................",
             "....................",
-            "....................",
-            "....................",
-            ".....#####..........",
-            ".....########.......",
-            ".....########.......",
-            ".....########.......",
-            ".....##.#####.......",
-            ".....##..####.......",
-            ".....##..#..........",
-            "....................",
+            ".........####.......",
+            ".........####.......",
+            ".........#####......",
+            ".......#######......",
+            ".......##...........",
+            ".....####.#.........",
+            ".....#######........",
+            ".......########.....",
+            ".........######.....",
+            ".........######.....",
             "....................",
             "....................",
             "....................",
@@ -580,13 +605,12 @@ class PygameVisualizer:
         # Wait while paused
         while self.is_paused and self.is_running and self.algorithm_running:
             time.sleep(0.05)
-            # Process events even while paused to maintain responsiveness
             pygame.event.pump()
 
         if not self.is_running or not self.algorithm_running:
             return
 
-    # Capture old robot position and grid to detect movement vector and sensor scans
+        # Capture old robot position and grid
         old_robot_pos = self.robot_pos
         old_grid = [row[:] for row in self.grid]
 
@@ -594,14 +618,13 @@ class PygameVisualizer:
         self.robot_pos = robot_pos
         self.step_count += 1
 
-        # Live turn detection: increment when robot changes movement direction
+        # --- XỬ LÝ SỰ KIỆN DI CHUYỂN & CẢM BIẾN (GIỮ NGUYÊN) ---
         try:
             if old_robot_pos is not None and self.robot_pos is not None:
                 if old_robot_pos != self.robot_pos:
                     r0, c0 = old_robot_pos
                     r1, c1 = self.robot_pos
                     move = (r1 - r0, c1 - c0)
-                    # Only consider non-zero moves
                     if move != (0, 0):
                         if self._prev_move_live is None:
                             self._prev_move_live = move
@@ -609,13 +632,10 @@ class PygameVisualizer:
                             if move != self._prev_move_live:
                                 self.live_turns += 1
                                 self._prev_move_live = move
-            # Keep last_path_turns in sync so panel shows live value
             self.last_path_turns = self.live_turns
         except Exception:
-            # Don't crash the visualizer on unexpected coordinate shapes
             pass
 
-        # Detect sensor scan: if any cell within sensor radius changed from non-COVERED to COVERED
         try:
             if self.show_sensor and self.sensor_radius > 0:
                 rr, rc = self.robot_pos
@@ -636,7 +656,8 @@ class PygameVisualizer:
         except Exception:
             pass
 
-        # Update coverage path if provided
+        # --- [FIX QUAN TRỌNG TẠI ĐÂY] ---
+        # Update coverage path with APPEND LOGIC
         if coverage_path is not None:
             # Ensure we have enough coverage paths stored
             while len(self.coverage_paths) < coverage_id:
@@ -644,13 +665,25 @@ class PygameVisualizer:
 
             # Update the specific coverage path
             if coverage_id <= len(self.coverage_paths):
-                self.coverage_paths[coverage_id - 1] = coverage_path.copy()
+                existing_path = self.coverage_paths[coverage_id - 1]
 
-        # Count covered cells (only when needed)
+                # Logic thông minh: Nối thêm hay Ghi đè?
+                # Nếu path hiện tại có dữ liệu VÀ path mới chỉ là 1 đoạn ngắn (2 điểm)
+                # VÀ điểm đầu của path mới trùng với điểm cuối của path cũ
+                # => Đây là bước Resume+1 nối tiếp => APPEND (Nối thêm)
+                if (len(existing_path) > 0 and len(coverage_path) == 2 and
+                        existing_path[-1] == coverage_path[0]):
+                    self.coverage_paths[coverage_id -
+                                        1].append(coverage_path[1])
+                else:
+                    # Trường hợp còn lại (BM thông thường): Ghi đè toàn bộ (Overwrite)
+                    self.coverage_paths[coverage_id - 1] = coverage_path.copy()
+
+        # Count covered cells
         if self.step_count % 10 == 0:
             self.covered_count = sum(row.count(COVERED) for row in self.grid)
 
-        # Apply speed delay only if not paused
+        # Apply speed delay
         if not self.is_paused and self.step_size > 0:
             time.sleep(max(0.001, self.step_size))
 
