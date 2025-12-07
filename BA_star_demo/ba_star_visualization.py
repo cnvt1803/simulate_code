@@ -251,7 +251,7 @@ class PygameVisualizer:
         for r, row in enumerate(MAP_20):
             for c, ch in enumerate(row):
                 self.grid[r][c] = OBSTACLE if ch == "#" else FREE_UNCOVERED
-    def set_fixed_map_layout3(self):
+    def set_fixed_map_layout01(self):
         MAP_20 = [
             "....................",
             "....................",
@@ -277,7 +277,7 @@ class PygameVisualizer:
         for r, row in enumerate(MAP_20):
             for c, ch in enumerate(row):
                 self.grid[r][c] = OBSTACLE if ch == "#" else FREE_UNCOVERED
-    def set_fixed_map_layout01(self):
+    def set_fixed_map_layout011(self):
         MAP_20 = [
             "....................",
             "....................",

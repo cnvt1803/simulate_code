@@ -319,7 +319,8 @@ def boustrophedon_motion(
     coverage_id=1,
     sensor_radius=0,
     stop_on_hole=False,
-    allow_hole_detection=True
+    allow_hole_detection=True,
+    is_hole_scanning=False
 ):
     """
     BM + cảm biến r + luật đổi trục:
@@ -581,8 +582,6 @@ def boustrophedon_motion(
 
         return walking_along_wall, wall_side
 
-    # --- Hàm 2: Kiểm tra Look-Ahead (Trước khi di chuyển) ---
-
     def check_wall_look_ahead(grid, r, c, nr, nc, long_dir):
         """
         So sánh trạng thái tường ở ô hiện tại (r,c) và ô sắp đến (nr,nc).
@@ -668,6 +667,7 @@ def boustrophedon_motion(
                 wall_side = right_sd
 
         return walking_along_wall, wall_side, should_check, reason
+
     # ---------- init pattern ----------
     main_axis = "NS"
     prev_lap = 0
@@ -732,16 +732,21 @@ def boustrophedon_motion(
     # ==============================================================================
 
     # mark start
-    if grid[r][c] == FREE_UNCOVERED:
-        grid[r][c] = COVERED
+    # ==============================================================================
+    if grid[r][c] != OBSTACLE:
+        # Chỉ tô màu nếu nó chưa được tô, nhưng LUÔN thêm vào path
+        if grid[r][c] == FREE_UNCOVERED:
+            grid[r][c] = COVERED
+
         coverage_path.append((r, c))
+
         if callback:
             callback(grid, (r, c), coverage_path, coverage_id)
     # if stop_on_hole and allow_hole_detection:
     #     hole_rep = find_adjacent_hole_rep(
     #         grid, r, c, max_bfs=2000, sensor_radius=sensor_radius, ignore_dir_index=long_dir)
     #     if hole_rep:
-    #         return (r, c), grid, coverage_path, hole_rep
+    #         return (r, c), grid, coverage_path,hole_rep, long_dir
 
     # ---------- main loop ----------
     while True:
@@ -766,7 +771,7 @@ def boustrophedon_motion(
                         hole_rep = find_adjacent_hole_rep(
                             grid, r, c, max_bfs=2000, sensor_radius=sensor_radius, ignore_dir_index=long_dir)
                         if hole_rep:
-                            return (r, c), grid, coverage_path, hole_rep
+                            return (r, c), grid, coverage_path, hole_rep, long_dir
 
             # ==============================================================================
             # THỰC HIỆN DI CHUYỂN
@@ -792,7 +797,8 @@ def boustrophedon_motion(
                 walking_along_wall, wall_side, should_check_post, reason_post = update_wall_state_post_move(
                     grid, r, c, pr, pc, long_dir, walking_along_wall, wall_side
                 )
-
+                if is_hole_scanning:
+                    should_check_post = False
                 # (Optional) Nếu muốn check hole tại post-event thì dùng biến should_check_post
                 if should_check_post:
                     print(
@@ -801,7 +807,7 @@ def boustrophedon_motion(
                         hole_rep = find_adjacent_hole_rep(
                             grid, r, c, max_bfs=2000, sensor_radius=sensor_radius, ignore_dir_index=long_dir)
                         if hole_rep:
-                            return (r, c), grid, coverage_path, hole_rep
+                            return (r, c), grid, coverage_path, hole_rep, long_dir
 
                 continue  # Hết vòng lặp longitudinal
 
@@ -859,7 +865,7 @@ def boustrophedon_motion(
                             hole_rep = find_adjacent_hole_rep(
                                 grid, r, c, max_bfs=2000, sensor_radius=sensor_radius, ignore_dir_index=long_dir)
                             if hole_rep:
-                                return (r, c), grid, coverage_path, hole_rep
+                                return (r, c), grid, coverage_path, hole_rep, long_dir
 
                     # 2. Nếu an toàn (hoặc không phát hiện hole), thực hiện bước đi
                     r, c = nr, nc
@@ -962,7 +968,7 @@ def boustrophedon_motion(
                             hole_rep = find_adjacent_hole_rep(
                                 grid, r, c, max_bfs=2000, sensor_radius=sensor_radius, ignore_dir_index=long_dir)
                             if hole_rep:
-                                return (r, c), grid, coverage_path, hole_rep
+                                return (r, c), grid, coverage_path, hole_rep, long_dir
 
                     # 2. Nếu an toàn (hoặc không phát hiện hole), thực hiện bước đi
                     r, c = nr, nc
@@ -1001,7 +1007,7 @@ def boustrophedon_motion(
                 break
 
         if not moved:
-            return (r, c), grid, coverage_path, None
+            return (r, c), grid, coverage_path, None, long_dir
 
 
 # --- 6. Thuật toán BA* (Algorithm 5) ---
@@ -1172,11 +1178,14 @@ class BAStar:
         s1, s2, s3, s4, s5, s6, s7, s8 = neighbors
         b_s1_s8 = b_function(s1, s8)
         b_s1_s2 = b_function(s1, s2)
+        b_s3_s2 = b_function(s3, s2)
+        b_s3_s4 = b_function(s3, s4)
         b_s5_s6 = b_function(s5, s6)
         b_s5_s4 = b_function(s5, s4)
         b_s7_s6 = b_function(s7, s6)
         b_s7_s8 = b_function(s7, s8)
-        mu_s = b_s1_s8 + b_s1_s2 + b_s5_s6 + b_s5_s4 + b_s7_s6 + b_s7_s8
+        mu_s = b_s1_s8 + b_s1_s2 + b_s3_s2 + b_s3_s4 + \
+            b_s5_s6 + b_s5_s4 + b_s7_s6 + b_s7_s8
         return mu_s
 
     def estimate_reachable_uncovered_area(self, start_r, start_c):
@@ -1304,12 +1313,11 @@ class BAStar:
             return best
         return rr, rc
 
-    def scan_hole(self, hole_rep):
+    def scan_hole(self, hole_rep, resume_dir_idx=None):
         """
         Xử lý quét 1 hole representative (hole_rep) với cơ chế Đệ quy + Resume.
         """
         # --- 1. Guard & Init ---
-        # Kiểm tra độ sâu để tránh Stack Overflow
         if not hasattr(self, 'hole_scan_depth'):
             self.hole_scan_depth = 0
         if self.hole_scan_depth >= getattr(self, 'max_hole_scan_depth', 5):
@@ -1324,7 +1332,6 @@ class BAStar:
             for comp in holes:
                 if hole_rep in comp:
                     self.hole_map[hole_rep] = comp
-                    # Đánh dấu toàn bộ component là "đã biết" để không thêm vào backtrack list nữa
                     for cell in comp:
                         self.used_backtracks.add(cell)
                     found = True
@@ -1333,7 +1340,6 @@ class BAStar:
                 return False
 
         # --- 2. Đánh dấu Resume Point (RP) ---
-        # Đây là điểm ta sẽ quay lại sau khi quét xong TOÀN BỘ cái hố này (và các hố con của nó)
         self.resume_stack.append(self.current_cp)
 
         self.hole_scan_depth += 1
@@ -1348,7 +1354,7 @@ class BAStar:
                 path_smoothed = a_star_spt(self.grid, path_astar)
                 if self.on_astar_callback:
                     self.on_astar_callback(path_smoothed)
-                # Di chuyển robot (update path nhưng KHÔNG tô màu COVERED)
+
                 for pos in path_smoothed[1:]:
                     if not self.total_path or self.total_path[-1] != pos:
                         self.total_path.append(pos)
@@ -1356,25 +1362,24 @@ class BAStar:
 
             # Cập nhật vị trí bắt đầu quét bên trong hố
             br, bc = self.current_pos
-            # next_start = self.point_after_backtracking(br, bc)
             next_start = br, bc
             if next_start != (br, bc):
                 self.current_pos = next_start
 
             # --- 4. VÒNG LẶP QUÉT & ĐỆ QUY (Core Logic) ---
-            # Vòng lặp này đảm bảo: Quét -> Gặp hố con -> Pause -> Quét hố con -> Resume
             while True:
                 try:
-                    # Chạy BM. Quan trọng: stop_on_hole=True để phát hiện hố lồng nhau
-                    s_cp, self.grid, hole_cov_path, nested_rep = boustrophedon_motion(
+                    # [QUAN TRỌNG] Unpack đủ 5 giá trị từ BM
+                    s_cp, self.grid, hole_cov_path, nested_rep, last_long_dir = boustrophedon_motion(
                         self.grid,
                         self.current_pos,
                         start_dir_index=0,
                         callback=self.on_step_callback,
                         coverage_id=self.coverage_count + 1,
                         sensor_radius=self.sensor_radius,
-                        stop_on_hole=True,         # BẬT: Để dừng lại nếu thấy hố con
-                        allow_hole_detection=True
+                        stop_on_hole=True,
+                        allow_hole_detection=True,
+                        is_hole_scanning=True
                     )
                 except Exception as e:
                     print(" !! Lỗi BM trong scan_hole:", e)
@@ -1385,41 +1390,39 @@ class BAStar:
                 if hole_cov_path:
                     self.coverage_count += 1
                     cov_id = self.coverage_count
-                    start_idx = 1 if hole_cov_path and hole_cov_path[0] == self.current_pos else 0
-                    for pos in hole_cov_path[start_idx:]:
+
+                    # [FIX VISUAL] Duyệt hết path, không bỏ phần tử đầu tiên
+                    for pos in hole_cov_path:
                         pr, pc = pos
                         if 0 <= pr < self.rows and 0 <= pc < self.cols:
                             self.grid[pr][pc] = COVERED
+
                         if not self.total_path or self.total_path[-1] != pos:
                             self.total_path.append(pos)
+
                         self.current_pos = pos
-                        if self.on_step_callback:
-                            try:
-                                self.on_step_callback(
-                                    self.grid, pos, hole_cov_path, cov_id)
-                            except:
-                                pass
+
+                        # if self.on_step_callback:
+                        #     try:
+                        #         self.on_step_callback(
+                        #             self.grid, pos, hole_cov_path, cov_id)
+                        #     except:
+                        #         pass
 
                     self.current_cp = hole_cov_path[-1]
                     self.current_pos = hole_cov_path[-1]
                 else:
-                    # Nếu không đi được bước nào và không có nested hole -> Đã kẹt hoặc xong
                     if nested_rep is None:
                         break
 
                 # --- XỬ LÝ ĐỆ QUY (NESTED HOLE) ---
                 if nested_rep:
                     print(
-                        f" >>> [Depth {self.hole_scan_depth}] Phát hiện NESTED HOLE tại {nested_rep}. Tạm dừng hố này, vào hố con.")
-
-                    # Gọi đệ quy: Robot sẽ chui vào hố con, quét sạch, và quay lại đúng chỗ này
+                        f" >>> [Depth {self.hole_scan_depth}] Phát hiện NESTED HOLE tại {nested_rep}.")
                     self.scan_hole(nested_rep)
-
                     print(
-                        f" <<< [Depth {self.hole_scan_depth}] Đã xong nested hole. Resume lại hố hiện tại từ {self.current_pos}")
-                    # Sau lệnh này, vòng while lặp lại -> BM chạy tiếp từ self.current_pos (chính là chỗ vừa đứng lại)
+                        f" <<< [Depth {self.hole_scan_depth}] Resume lại hố hiện tại từ {self.current_pos}")
                 else:
-                    # Không có nested hole nghĩa là BM đã chạy hết đường trong vùng này -> Xong hố
                     break
 
             # --- 5. Clean up Map ---
@@ -1430,11 +1433,11 @@ class BAStar:
             for rep in finished_reps:
                 self.hole_map.pop(rep, None)
 
-            # --- 6. Quay về Resume Point (Thoát hố) ---
+            # --- 6. Quay về Resume Point & RESUME + 1 ---
             if self.resume_stack:
                 resume_point = self.resume_stack.pop()
 
-                # Nếu robot chưa đứng ở cửa ra, dùng A* để đi ra
+                # A* quay về Resume Point
                 if self.current_pos != resume_point:
                     print(
                         f"--> [Depth {self.hole_scan_depth}] Xong hố. A* quay ra resume point {resume_point}")
@@ -1449,17 +1452,87 @@ class BAStar:
                                 self.total_path.append(pos)
                             self.current_pos = pos
                     else:
-                        print(
-                            "   !! Không tìm thấy đường ra resume point (có thể đã bị lấp).")
+                        print("   !! Không tìm thấy đường ra resume point.")
 
-                self.current_cp = resume_point
+                # Đứng tại resume point
                 self.current_pos = resume_point
+                self.current_cp = resume_point  # Tạm gán để nếu không +1 được thì vẫn đúng logic
 
                 if self.on_resume_callback:
                     try:
                         self.on_resume_callback(resume_point)
                     except:
                         pass
+
+                # ====================================================
+                # [LOGIC RESUME + 1] Tiến thêm 1 bước (FIXED: Xử lý cuối luống)
+                # ====================================================
+                if resume_dir_idx is not None:
+                    # Tạo danh sách các hướng ứng viên:
+                    # 1. Ưu tiên hướng cũ (resume_dir_idx)
+                    # 2. Nếu bị chặn, thử 2 hướng vuông góc (Lateral) để rẽ
+                    candidate_dirs = [resume_dir_idx]
+
+                    # Giả sử DIRECTIONS_BM: 0:N, 1:S, 2:E, 3:W
+                    # Đang đi dọc (N/S) -> Thêm ngang (E/W)
+                    if resume_dir_idx in [0, 1]:
+                        candidate_dirs.extend([2, 3])
+                    # Đang đi ngang (E/W) -> Thêm dọc (N/S)
+                    elif resume_dir_idx in [2, 3]:
+                        candidate_dirs.extend([0, 1])
+
+                    move_success = False
+
+                    for try_dir in candidate_dirs:
+                        dr, dc = DIRECTIONS_BM[try_dir]
+                        start_resume_pos = self.current_pos
+                        r_curr, c_curr = start_resume_pos
+                        next_step = (r_curr + dr, c_curr + dc)
+
+                        # Kiểm tra hợp lệ: Trong map VÀ Không phải vật cản VÀ (Quan trọng) Chưa được phủ
+                        # Lưu ý: Nếu ô đó đã phủ rồi thì không nên đi vào lại, trừ khi không còn đường nào khác
+                        if (0 <= next_step[0] < self.rows and
+                            0 <= next_step[1] < self.cols and
+                                # Chỉ đi vào ô FREE
+                                self.grid[next_step[0]][next_step[1]] == FREE_UNCOVERED):
+
+                            # --- CHẤP NHẬN BƯỚC ĐI NÀY ---
+                            self.coverage_count += 1  # Tăng ID đường vẽ
+
+                            # 1. Update Grid & Path
+                            self.grid[next_step[0]][next_step[1]] = COVERED
+
+                            if not self.total_path or self.total_path[-1] != next_step:
+                                self.total_path.append(next_step)
+
+                            # 2. GỌI CALLBACK
+                            if self.on_step_callback:
+                                try:
+                                    self.on_step_callback(
+                                        self.grid,
+                                        next_step,
+                                        [start_resume_pos, next_step],
+                                        self.coverage_count
+                                    )
+                                except:
+                                    pass
+
+                            # 3. Update State
+                            self.current_pos = next_step
+                            self.current_cp = next_step
+
+                            # [QUAN TRỌNG] Nếu rẽ ngang, cần cập nhật lại hướng chính cho robot
+                            # Tuy nhiên trong code này self.current_dir_index thường được reset bởi BM vòng sau
+                            # nên chỉ cần update vị trí là đủ.
+
+                            print(
+                                f"--> [Resume + 1] Thành công hướng {try_dir} tới {next_step}")
+                            move_success = True
+                            break  # Đã đi được 1 bước thì thoát vòng lặp candidates
+
+                    if not move_success:
+                        print(
+                            f"--> [Resume + 1] Bế tắc: Không thể tiến thẳng hay rẽ ngang từ {self.current_pos}")
 
         finally:
             self.hole_scan_depth -= 1
@@ -1468,8 +1541,8 @@ class BAStar:
             print(f"<- [Depth {self.hole_scan_depth + 1}] Thoát scan_hole.")
 
         return True
-
     # ------------------ Main run (integrated hole handling) ------------------
+
     def run(self):
         print("--- Bắt đầu Thuật toán BA* ---")
         step = 1
@@ -1482,7 +1555,7 @@ class BAStar:
 
             # B2: Bao phủ bằng BM
             print("1. Thực hiện Chuyển động Boustrophedon (BM)...")
-            s_cp, self.grid, coverage_path, hole_rep = boustrophedon_motion(
+            s_cp, self.grid, coverage_path, hole_rep, last_long_dir = boustrophedon_motion(
                 self.grid,
                 self.current_pos,
                 self.current_dir_index,
@@ -1490,13 +1563,14 @@ class BAStar:
                 self.coverage_count,
                 sensor_radius=self.sensor_radius,
                 stop_on_hole=True,
+                is_hole_scanning=False
             )
             self.current_cp = s_cp
             self.coverage_paths.append(coverage_path)
 
             # Nếu phát hiện hole kề robot -> xử lý hole
             if hole_rep is not None:
-                self.scan_hole(hole_rep)
+                self.scan_hole(hole_rep, resume_dir_idx=last_long_dir)
                 step += 1
                 continue
 
@@ -1507,7 +1581,7 @@ class BAStar:
             print(f"2. Phát hiện corner backtracks: {backtracking_list}")
 
             # --- NEW: detect holes online and add reps vào backtracking_list (nếu không đang quét) ---
-            # if not self.in_hole_scan: #! tắt
+
             holes = self.detect_holes()
             for comp in holes:
                 # chỉ thêm nếu component còn ô FREE_UNCOVERED

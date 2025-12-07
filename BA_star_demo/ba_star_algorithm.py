@@ -870,6 +870,11 @@ def boustrophedon_motion(
                             if hole_rep:
                                 return (r, c), grid, coverage_path, hole_rep, long_dir
 
+                    if stop_on_hole and allow_hole_detection:
+                        hole_rep = find_adjacent_hole_rep(
+                            grid, r, c, max_bfs=2000, sensor_radius=sensor_radius, ignore_dir_index=long_dir)
+                        if hole_rep:
+                            return (r, c), grid, coverage_path, hole_rep, long_dir
 
                     # 2. Nếu an toàn (hoặc không phát hiện hole), thực hiện bước đi
                     r, c = nr, nc
@@ -974,6 +979,11 @@ def boustrophedon_motion(
                             if hole_rep:
                                 return (r, c), grid, coverage_path, hole_rep, long_dir
 
+                    if stop_on_hole and allow_hole_detection:
+                        hole_rep = find_adjacent_hole_rep(
+                            grid, r, c, max_bfs=2000, sensor_radius=sensor_radius, ignore_dir_index=long_dir)
+                        if hole_rep:
+                            return (r, c), grid, coverage_path, hole_rep, long_dir
 
                     # 2. Nếu an toàn (hoặc không phát hiện hole), thực hiện bước đi
                     r, c = nr, nc
@@ -981,6 +991,7 @@ def boustrophedon_motion(
                     coverage_path.append((r, c))
                     if callback:
                         callback(grid, (r, c), coverage_path, coverage_id)
+                    
                     cur_lap = 2
                 else:
                     cur_lap = 1
