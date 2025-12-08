@@ -310,6 +310,118 @@ def find_adjacent_hole_rep(grid, r, c, max_bfs=500, sensor_radius=None, ignore_d
 
     return None
 
+
+def find_adjacent_hole_rep_end(grid, r, c, max_bfs=500, sensor_radius=None, ignore_dir_index=None):
+    """
+    Tìm candidate (Hole Representative).
+    Logic cập nhật: CHỈ kiểm tra ô ở PHÍA SAU LƯNG (Backward).
+    """
+    rows, cols = len(grid), len(grid[0])
+    FREE = 0
+
+    # --- Helper: BFS (Giữ nguyên) ---
+    def is_reachable_to_border(sr, sc, bfs_limit=max_bfs, R=sensor_radius):
+        q = deque()
+        visited = set()
+        q.append((sr, sc, 0))
+        visited.add((sr, sc))
+        steps = 0
+        reached_r_boundary = False
+        dirs4 = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+        while q:
+            rr, cc, dist = q.popleft()
+            if rr == 0 or rr == rows - 1 or cc == 0 or cc == cols - 1:
+                return True
+            if R is not None and dist >= R:
+                for dr, dc in dirs4:
+                    nr, nc = rr + dr, cc + dc
+                    if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == FREE and (nr, nc) not in visited:
+                        reached_r_boundary = True
+                steps += 1
+                if bfs_limit is not None and steps >= bfs_limit:
+                    return None
+                continue
+            for dr, dc in dirs4:
+                nr, nc = rr + dr, cc + dc
+                if 0 <= nr < rows and 0 <= nc < cols and (nr, nc) not in visited and grid[nr][nc] == FREE:
+                    visited.add((nr, nc))
+                    q.append((nr, nc, dist + 1))
+            steps += 1
+            if bfs_limit is not None and steps >= bfs_limit:
+                return None
+        if reached_r_boundary:
+            return None
+        return False
+
+    # --- Helper: Tính khoảng cách (Giữ nguyên) ---
+    def get_dist_to_obstacle(start_r, start_c, dr, dc):
+        dist = 0
+        curr_r, curr_c = start_r + dr, start_c + dc
+        while 0 <= curr_r < rows and 0 <= curr_c < cols:
+            if grid[curr_r][curr_c] in (1, 2):
+                break
+            dist += 1
+            curr_r += dr
+            curr_c += dc
+        return dist
+
+    # --- Main Logic ---
+
+    # 1. Xác định hướng Sau lưng (Backward)
+    backward_delta = None
+    dir_names = {(-1, 0): "BAC (N)", (1, 0): "NAM (S)",
+                 (0, 1): "DONG (E)", (0, -1): "TAY (W)"}
+    moving_dir_name = "KHONG XAC DINH"
+
+    if ignore_dir_index is not None and 0 <= ignore_dir_index < 4:
+        # Lấy tên hướng đang đi để debug
+        ignore_delta = DIRECTIONS_BM[ignore_dir_index]
+        moving_dir_name = dir_names.get(ignore_delta, "?")
+
+        # Tính hướng ngược lại
+        opposite_map = {0: 1, 1: 0, 2: 3, 3: 2}
+        back_idx = opposite_map.get(ignore_dir_index)
+        if back_idx is not None:
+            backward_delta = DIRECTIONS_BM[back_idx]
+
+    # Nếu không xác định được hướng sau lưng thì return luôn
+    if backward_delta is None:
+        return None
+
+    neighbor_dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+    # print(f"DEBUG: --- Check Hole PHÍA SAU tại {r},{c} | Dang di ve: {moving_dir_name} ---")
+
+    candidates = []
+
+    for dr, dc in neighbor_dirs:
+        # [QUAN TRỌNG] Logic lọc: Chỉ chấp nhận hướng Sau lưng
+        if (dr, dc) != backward_delta:
+            continue
+
+        d_name = dir_names.get((dr, dc), "?")
+        # print(f"  [CHECK] {d_name} (Sau lung)...")
+
+        nr, nc = r + dr, c + dc
+
+        # Kiểm tra điều kiện: Trong Grid VÀ là ô FREE
+        if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == FREE:
+            # Chạy thuật toán kiểm tra Hole
+            res = is_reachable_to_border(
+                nr, nc, bfs_limit=max_bfs, R=sensor_radius)
+
+            if res is False:  # Là Hole
+                dist = get_dist_to_obstacle(r, c, dr, dc)
+                candidates.append(((nr, nc), dist))
+                print(
+                    f"    -> FOUND HOLE candidate phia sau tai {d_name} ({nr},{nc}), Dist={dist}")
+
+    # Trả về kết quả (thực ra chỉ có tối đa 1 candidate vì chỉ check 1 hướng)
+    if candidates:
+        return candidates[0][0]
+
+    return None
 def boustrophedon_motion(
     grid,
     start_pos,
@@ -871,7 +983,7 @@ def boustrophedon_motion(
                                 return (r, c), grid, coverage_path, hole_rep, long_dir
 
                     if stop_on_hole and allow_hole_detection:
-                        hole_rep = find_adjacent_hole_rep(
+                        hole_rep = find_adjacent_hole_rep_end(
                             grid, r, c, max_bfs=2000, sensor_radius=sensor_radius, ignore_dir_index=long_dir)
                         if hole_rep:
                             return (r, c), grid, coverage_path, hole_rep, long_dir
@@ -980,7 +1092,7 @@ def boustrophedon_motion(
                                 return (r, c), grid, coverage_path, hole_rep, long_dir
 
                     if stop_on_hole and allow_hole_detection:
-                        hole_rep = find_adjacent_hole_rep(
+                        hole_rep = find_adjacent_hole_rep_end(
                             grid, r, c, max_bfs=2000, sensor_radius=sensor_radius, ignore_dir_index=long_dir)
                         if hole_rep:
                             return (r, c), grid, coverage_path, hole_rep, long_dir
